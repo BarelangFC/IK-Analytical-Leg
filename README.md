@@ -1,61 +1,104 @@
-# IK-Leg-Solver
-this program will alow you to find the inverse kinematic and forward kinematic for leg with parallel mekanik, and also the trajectory
-to run this program you will need 
-- ros any version because you'll need the pyKDL
-- matplotlib
-- numpy
+# IK-Analytical-Leg
 
-Setup Workspace
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![NumPy](https://img.shields.io/badge/dep-numpy-013243.svg)](https://numpy.org)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/BarelangFC/IK-Analytical-Leg/actions/workflows/ci.yml/badge.svg)](https://github.com/BarelangFC/IK-Analytical-Leg/actions/workflows/ci.yml)
 
-Install dependencies
+**Pure NumPy Analytical IK/FK solver for a 7-DOF humanoid robot leg.**
+
+![Demo GIF](demo.gif)
+
+## Overview
+
+IK-Analytical-Leg provides an analytical closed-form inverse kinematics solution
+for a humanoid robot leg with 7 degrees of freedom:
+
+| Joint | Axis | Description |
+|-------|------|-------------|
+| qHipYaw | Z | Hip rotation (yaw) |
+| qHipRoll | X | Hip adduction/abduction (roll) |
+| qHipPitch | Y | Hip flexion/extension (pitch) |
+| qAnklePitch | Y | Ankle flexion/extension (pitch) |
+| qAnkleRoll | X | Ankle adduction/abduction (roll) |
+
+The knee uses a **parallel mechanism**: the knee bend angle is split equally
+between the hip pitch and ankle pitch joints, matching the physical 4-bar linkage
+on Barelang FC humanoid legs.
+
+### Leg chain
+
 ```
-sudo apt install python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential
-sudo apt install ros-noetic-ros-control
-sudo apt install ros-noetic-ros-controllers
+base → hip_yaw (Z) → hip_roll (X) → hip → knee_up → knee_down → ankle_pitch (Y) → ankle_roll (X) → sole
 ```
-Clone simulation package
+
+### Dependencies
+
+- Python ≥ 3.10
+- NumPy ≥ 1.21
+- _(optional)_ matplotlib + pillow for GIF generation
+
+## Install
+
+```bash
+pip install git+https://github.com/BarelangFC/IK-Analytical-Leg.git
 ```
-cd ~
-mkdir -p barelangfc/src
-cd barelangfc/src
-git clone -b noetic-devel https://github.com/ROBOTIS-GIT/DynamixelSDK.git
-git clone https://github.com/ROBOTIS-GIT/ROBOTIS-Framework.git
-git clone https://github.com/ROBOTIS-GIT/ROBOTIS-Framework-msgs.git
-git clone https://github.com/ROBOTIS-GIT/ROBOTIS-Math.git
-git clone https://github.com/ROBOTIS-GIT/ROBOTIS-Utility.git
-git clone https://github.com/roboticsgroup/roboticsgroup_gazebo_plugins.git
-git clone https://github.com/BarelangFC/BarelangFC-AdultSize-Simulation.git
-git clone https://github.com/BarelangFC/IK-Leg-Solver.git
-cd ..
-catkin_make
-source devel/setup.bash 
+
+Or for development (with demo tools):
+
+```bash
+git clone git@github.com:BarelangFC/IK-Analytical-Leg.git
+cd IK-Analytical-Leg
+pip install -e ".[demo]"
 ```
-Terminal 1 Running Simulation note : after gazebo's open,double click on body frame, and activate Kinematics to prevent robot from falling, click play on beside real time factor
+
+## Usage
+
+### CLI
+
+```bash
+# Solve IK for a single foot pose
+ik-leg solve 0 0.105 -0.652 --yaw 0
+
+# Compute joint trajectory from Bezier control points
+ik-leg trajectory "0,0.105,-0.7; 0.1,0.105,-0.42; 0.2,0.105,-0.7"
 ```
-cd ~
-cd barelangfc
-source devel/setup.bash
-roslaunch humanoid_gazebo humanoid_gazebo.launch
+
+### Python API
+
+```python
+from ik_analytical_leg import ik, fk, solve, Bezier
+
+# Single pose IK
+joints = ik(x=0.0, y=0.105, z=-0.652, yaw=0.0)
+# joints = [qHY, qHR, qHP, qAP, qAR]
+
+# IK + FK verification
+result = solve(x=0.12, y=0.105, z=-0.65, yaw=0.05)
+if result["success"]:
+    print(f"Joints (deg): {[round(j, 2) for j in result['joints']]}")
+    print(f"Error: {result['error']:.6f}")
+
+# Bezier foot trajectory
+import numpy as np
+t_vals = np.linspace(0, 1, 50)
+ctrl = np.array([[0, 0.105, -0.7], [0.1, 0.105, -0.42], [0.2, 0.105, -0.7]])
+xyz = Bezier.curve(t_vals, ctrl)  # (50, 3) foot positions
 ```
-Terminal 2 Running Humanoid Manager
+
+### Generate demo GIF
+
+```bash
+pip install -e ".[demo]"
+python scripts/generate_demo.py
 ```
-cd ~
-cd barelangfc
-source devel/setup.bash
-roslaunch humanoid_manager humanoid_gazebo.launch
+
+## Development
+
+```bash
+pip install -e ".[dev]"
 ```
-Terminal 3 Running Rviz
-```
-cd ~
-cd barelangfc
-source devel/setup.bash
-roslaunch humanoid_description humanoid_display.launch
-```
-Terminal 4 Running Program
-```
-cd ~
-cd barelangfc/src/Bezier
-python3 Trajectory.py 
-or
-python3 RandomPose.py
-```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
